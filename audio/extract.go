@@ -1,8 +1,6 @@
-// Package audio extracts an audio track from a video (or audio) file via
-// ffmpeg into a transcriber-ready WAV. It has no dependency on
-// utils/video/frames or on any transcription backend — it is a
-// standalone, independently testable unit: input a media path, output a WAV
-// file, nothing more.
+// Package audio extracts and preprocesses audio from a video (or audio) file
+// via ffmpeg into a transcriber-ready WAV. It has no dependency on frames or
+// on any transcription backend.
 package audio
 
 import (
@@ -32,6 +30,10 @@ const (
 // Extract demuxes videoPath's audio track into outPath (a .wav file; parent
 // dir must already exist) and returns outPath on success.
 func Extract(ctx context.Context, videoPath, outPath string, opts Options) (string, error) {
+	return renderWAV(ctx, videoPath, outPath, opts, "", "extract audio")
+}
+
+func renderWAV(ctx context.Context, mediaPath, outPath string, opts Options, filter, operation string) (string, error) {
 	if err := ffmpegutil.CheckAvailable(); err != nil {
 		return "", err
 	}
@@ -43,17 +45,22 @@ func Extract(ctx context.Context, videoPath, outPath string, opts Options) (stri
 	}
 
 	args := []string{
-		"-y", "-i", videoPath,
+		"-y", "-i", mediaPath,
 		"-vn", // drop video stream — audio only
+	}
+	if filter != "" {
+		args = append(args, "-af", filter)
+	}
+	args = append(args,
 		"-ar", fmt.Sprintf("%d", opts.SampleRateHz),
 		"-ac", fmt.Sprintf("%d", opts.Channels),
 		"-c:a", "pcm_s16le",
 		outPath,
-	}
+	)
 
 	cmd := exec.CommandContext(ctx, "ffmpeg", args...)
 	if out, err := cmd.CombinedOutput(); err != nil {
-		return "", fmt.Errorf("ffmpeg extract audio: %w: %s", err, out)
+		return "", fmt.Errorf("ffmpeg %s: %w: %s", operation, err, out)
 	}
 	return outPath, nil
 }

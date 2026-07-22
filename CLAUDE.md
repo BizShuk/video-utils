@@ -9,11 +9,11 @@ Its module path is `github.com/bizshuk/video-utils` and it uses Go
 ```text
 utils/video/
 ├── go.mod
-├── audio/       # video/audio track to transcriber-ready WAV
+├── audio/       # audio extraction and white-noise reduction to WAV
 ├── frames/      # interval and scene-change still-frame sampling
 ├── subtitles/   # audio extraction, transcription, and SRT output
 ├── ffmpegutil/  # ffmpeg availability and ffprobe duration helpers
-└── cmd/         # reusable Cobra command tree
+└── cmd/         # reusable package-level Cobra stage commands
 ```
 
 Dependencies are one-way:
@@ -31,15 +31,21 @@ the command package.
 
 ## Public command contract
 
-`cmd.NewCommand() *cobra.Command` returns a new command tree with independent
-flag state on every call. It provides `audio`, `frames`, and `subtitles`
-subcommands and keeps their existing flags and output behavior.
+`cmd.VideoCmd` is the reusable parent command. It registers the exported
+package-level `cmd.AudioCmd`, `cmd.DenoiseCmd`, `cmd.FramesCmd`, and
+`cmd.SubtitlesCmd` stage commands during package initialization. Flags bind in
+`init()` and therefore retain Cobra state for the lifetime of the process.
+
+On success, command stdout contains only output paths, one path per line:
+`audio` and `denoise` print their WAV, `frames` prints every generated still,
+and `subtitles` prints its SRT. Informational summaries and warnings use stderr.
 
 ## Runtime requirements
 
-Library operations invoke `ffmpeg` and `ffprobe` from `PATH`. Real subtitles
-also require either Whisper.cpp or the Qwen3/MLX wrapper runtime. Tests that
-need optional system runtimes skip themselves when those runtimes are absent.
+Library operations invoke `ffmpeg` and `ffprobe` from `PATH`; white-noise
+reduction requires FFmpeg's `afftdn` audio filter. Real subtitles also require
+either Whisper.cpp or the Qwen3/MLX wrapper runtime. Tests that need optional
+system runtimes skip themselves when those runtimes are absent.
 
 ## Development
 
