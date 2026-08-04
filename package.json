@@ -1,0 +1,11 @@
+{
+  "name": "video-utils",
+  "version": "0.0.0",
+  "private": true,
+  "description": "ffmpeg-based 媒體前處理 Go module：audio / frames / denoise / subtitles 與可重用 Cobra 命令樹",
+  "scripts": {
+    "test": "go test ./...",
+    "build": "go build ./...",
+    "lint": "gofmt -l . && go vet ./..."
+  }
+}
