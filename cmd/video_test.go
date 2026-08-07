@@ -26,6 +26,8 @@ func TestVideoCmdBuildsStageCommandTree(t *testing.T) {
 		{use: "denoise <media>", want: DenoiseCmd},
 		{use: "frames <video>", want: FramesCmd},
 		{use: "subtitles <video>", want: SubtitlesCmd},
+		{use: "cut-audio <media>", want: CutAudioCmd},
+		{use: "cut-video <video>", want: CutVideoCmd},
 	}
 	for _, test := range tests {
 		t.Run(test.use, func(t *testing.T) {
@@ -84,6 +86,14 @@ printf '%s\n' '{"format":{"duration":"1.000"}}'
 	oldSubtitlesWorkDir := subtitlesWorkDir
 	oldSubtitlesKeepAudio := subtitlesKeepAudio
 	oldSubtitlesEngine := subtitlesEngine
+	oldCutAudioOutputDir := cutAudioOutputDir
+	oldCutAudioDuration := cutAudioDuration
+	oldCutAudioFrom := cutAudioFrom
+	oldCutAudioTo := cutAudioTo
+	oldCutVideoOutputDir := cutVideoOutputDir
+	oldCutVideoDuration := cutVideoDuration
+	oldCutVideoFrom := cutVideoFrom
+	oldCutVideoTo := cutVideoTo
 	t.Cleanup(func() {
 		audioOutputPath = oldAudioOutputPath
 		denoiseOutputPath = oldDenoiseOutputPath
@@ -95,6 +105,14 @@ printf '%s\n' '{"format":{"duration":"1.000"}}'
 		subtitlesWorkDir = oldSubtitlesWorkDir
 		subtitlesKeepAudio = oldSubtitlesKeepAudio
 		subtitlesEngine = oldSubtitlesEngine
+		cutAudioOutputDir = oldCutAudioOutputDir
+		cutAudioDuration = oldCutAudioDuration
+		cutAudioFrom = oldCutAudioFrom
+		cutAudioTo = oldCutAudioTo
+		cutVideoOutputDir = oldCutVideoOutputDir
+		cutVideoDuration = oldCutVideoDuration
+		cutVideoFrom = oldCutVideoFrom
+		cutVideoTo = oldCutVideoTo
 	})
 
 	audioOutputPath = filepath.Join(outputDir, "audio.wav")
@@ -107,6 +125,14 @@ printf '%s\n' '{"format":{"duration":"1.000"}}'
 	subtitlesWorkDir = filepath.Join(outputDir, "subtitles-work")
 	subtitlesKeepAudio = false
 	subtitlesEngine = "noop"
+	cutAudioOutputDir = filepath.Join(outputDir, "audio-segments")
+	cutAudioDuration = time.Second
+	cutAudioFrom = 0
+	cutAudioTo = 0
+	cutVideoOutputDir = filepath.Join(outputDir, "video-segments")
+	cutVideoDuration = time.Second
+	cutVideoFrom = 0
+	cutVideoTo = 0
 
 	tests := []struct {
 		name string
@@ -117,6 +143,8 @@ printf '%s\n' '{"format":{"duration":"1.000"}}'
 		{name: "denoise", run: runDenoise, want: []string{denoiseOutputPath}},
 		{name: "frames", run: runFrames, want: []string{filepath.Join(framesOutputDir, "frame-000001.jpg")}},
 		{name: "subtitles", run: runSubtitles, want: []string{subtitlesOutputPath}},
+		{name: "cut-audio", run: runCutAudio, want: []string{filepath.Join(cutAudioOutputDir, "audio-000001.wav")}},
+		{name: "cut-video", run: runCutVideo, want: []string{filepath.Join(cutVideoOutputDir, "video-000001.mp4")}},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -136,6 +164,22 @@ printf '%s\n' '{"format":{"duration":"1.000"}}'
 				t.Errorf("stdout = %q, want path-only output %q", got, want)
 			}
 		})
+	}
+}
+
+func TestCutCommandsExposeFromToFlags(t *testing.T) {
+	for _, command := range []*cobra.Command{CutAudioCmd, CutVideoCmd} {
+		for _, name := range []string{"from", "to", "duration"} {
+			if command.Flags().Lookup(name) == nil {
+				t.Errorf("%s missing --%s flag", command.Name(), name)
+			}
+		}
+		if got := command.Flags().Lookup("from").DefValue; got != "0s" {
+			t.Errorf("%s --from default = %q, want 0s", command.Name(), got)
+		}
+		if got := command.Flags().Lookup("to").DefValue; got != "0s" {
+			t.Errorf("%s --to default = %q, want 0s", command.Name(), got)
+		}
 	}
 }
 

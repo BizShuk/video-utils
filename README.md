@@ -9,6 +9,8 @@ Standalone Go module for ffmpeg-based media preprocessing:
   transcriber-ready WAV.
 - `frames`: sample still frames with interval and scene-change options.
 - `subtitles`: extract audio, run a pluggable transcriber, and write SRT.
+- `segment`: cut media into fixed-duration audio WAV or video segments,
+  with optional `--from` / `--to` source window bounds.
 - `ffmpegutil`: check ffmpeg availability and probe media duration.
 - `cmd`: reusable Cobra command tree rooted at the package-level `VideoCmd`.
 
@@ -18,7 +20,7 @@ The module does not import `github.com/bizshuk/agentsdk`.
 
 > [!NOTE]
 > This module provides reusable Cobra commands; it does not build a standalone
-> executable. A host CLI such as `auth-cli` registers `cmd.VideoCmd`:
+> executable. A host CLI such as `videoutils` registers `cmd.VideoCmd`:
 
 ```go
 import videocmd "github.com/bizshuk/video-utils/cmd"
@@ -29,11 +31,13 @@ rootCmd.AddCommand(videocmd.VideoCmd)
 The composed command exposes these stages:
 
 ```text
-auth-cli video
+videoutils video
 ├── audio <video>       # stdout: generated WAV path
 ├── denoise <media>     # stdout: generated denoised WAV path
 ├── frames <video>      # stdout: one generated still path per line
-└── subtitles <video>   # stdout: generated SRT path
+├── subtitles <video>   # stdout: generated SRT path
+├── cut-audio <media>   # stdout: one generated WAV segment path per line
+└── cut-video <video>   # stdout: one generated video segment path per line
 ```
 
 Example usage:
@@ -41,10 +45,15 @@ Example usage:
 ```bash
 mkdir -p output
 
-auth-cli video audio input.mp4 --out output/audio.wav
-auth-cli video denoise input.mp4 --out output/denoised.wav
-auth-cli video frames input.mp4 --out output/frames --interval 2s
-auth-cli video subtitles input.mp4 \
+videoutils video audio input.mp4 --out output/audio.wav
+videoutils video denoise input.mp4 --out output/denoised.wav
+videoutils video frames input.mp4 --out output/frames --interval 2s
+videoutils video cut-audio input.mp4 --out output/audio-segments --duration 5m
+videoutils video cut-video input.mp4 --out output/video-segments --duration 5m
+# Optional --from/--to bound the source window; --duration still owns segment length.
+videoutils video cut-audio input.mp4 --out output/audio-segments --from 1m --to 20m --duration 5m
+videoutils video cut-video input.mp4 --out output/video-segments --from 30s --to 10m --duration 2m
+videoutils video subtitles input.mp4 \
   --engine whisper \
   --whisper-bin /path/to/whisper-cli \
   --whisper-model /path/to/ggml-model.bin \
@@ -55,8 +64,8 @@ Successful stdout is path-only, so callers can capture or pipe the generated
 paths directly. Informational summaries and warnings are written to stderr:
 
 ```bash
-audio_path="$(auth-cli video audio input.mp4 --out output/audio.wav)"
-auth-cli video frames input.mp4 --out output/frames > output/frame-paths.txt
+audio_path="$(videoutils video audio input.mp4 --out output/audio.wav)"
+videoutils video frames input.mp4 --out output/frames > output/frame-paths.txt
 ```
 
 ## White-noise reduction
@@ -67,10 +76,10 @@ Use the reusable Go API:
 _, err := audio.ReduceWhiteNoise(ctx, "input.mp4", "denoised.wav", audio.WhiteNoiseOptions{})
 ```
 
-Or the composed `auth-cli` command:
+Or the composed `videoutils` command:
 
 ```bash
-auth-cli video denoise input.mp4 --out denoised.wav
+videoutils video denoise input.mp4 --out denoised.wav
 ```
 
 The defaults reduce white noise by `12 dB` with an estimated noise floor of
